@@ -172,7 +172,7 @@ function render(){
     }else{
       h+='<p class="help">'+B('Tap a green “Open” slot or “Request a change” to send a request.','초록색 ‘예약 가능’ 칸이나 ‘시간 변경 신청’ 버튼을 누르면 신청할 수 있어요.')+'<span class="ko">'+esc(state.settings.contact)+'</span></p>';
     }
-    h+='<p class="foot"><a href="teacher.html">'+B('Teachers','선생님 페이지')+'</a></p>';
+    h+='<p class="foot"><a href="trial.html">'+B('Book a trial class','체험수업 신청')+'</a> · <a href="teacher.html">'+B('Teachers','선생님 페이지')+'</a></p>';
   }else{
     h+='<div class="panel"><h3>'+B('Teacher info','선생님 정보')+'</h3><div class="fields">'+
       '<label class="field"><span>'+B('Name','이름')+'</span><input id="tName" data-in="tName" value="'+esc(T.name)+'" maxlength="30"></label>'+
