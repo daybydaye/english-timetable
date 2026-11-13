@@ -23,7 +23,7 @@
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
 [hidden] { display: none !important; }
-.wrap { max-width: 1040px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
 h1, h2 { margin: 0; text-wrap: balance; }
 h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; }
 h2 { font-size: 1.05rem; font-weight: 600; }
@@ -69,7 +69,18 @@ a.card:hover { border-color: var(--accent); }
 .linkrow { display: flex; gap: 6px; min-width: 0; }
 .linkrow input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
 .back { font-size: 0.9rem; text-decoration: none; }
-.caplink { font-size: 0.85rem; text-decoration: none; }
+.caplink { font-size: 0.85rem; text-decoration: none; border: 1px solid var(--accent); border-radius: 6px; padding: 3px 10px; }
+.caplink:hover { background: var(--accent-soft); }
+.tables { display: grid; grid-template-columns: 1fr; }
+.tables table { font-size: 0.85rem; }
+.tables th, .tables td { padding: 4px 10px; }
+.tables td.no { width: 2.2em; }
+.tables td.date { white-space: nowrap; }
+.tables .acts button { padding: 2px 9px; font-size: 0.8rem; }
+@media (min-width: 900px) {
+  .tables { grid-template-columns: 1fr 1fr; }
+  .tables .tablewrap + .tablewrap { border-left: 1px solid var(--line); }
+}
 /* student schedule card: fits one phone screen for a screenshot */
 body.capmode .top { display: none; }
 body.capmode #keyslot { display: none; }
@@ -422,18 +433,18 @@ th .bi .ko { letter-spacing: 0; }
       const past = r.date < TODAY ? " past" : "", today = r.date === TODAY ? " today" : "";
       if (!r.rec) {
         items.push([r.date, 0, `<tr class="${past}${today}">
-          <td class="no mono">${p.noByDate.get("lesson" + r.date)}</td><td class="date mono">${fmt(r.date)}</td>
-          <td class="hide-sm">${r.date === TODAY ? `<span class="chip a">${I("Today", "오늘")}</span>` : past ? `<span class="sub">${I("Past", "지난 수업")}</span>` : ""}</td>
+          <td class="no mono">${p.noByDate.get("lesson" + r.date)}</td>
+          <td class="date mono">${fmt(r.date)}${r.date === TODAY ? ` <span class="chip a">${I("Today", "오늘")}</span>` : ""}</td>
           <td><div class="acts">
-            <button class="t" data-act="pp" data-by="teacher" data-blk="${esc(blk.cell)}" data-date="${r.date}" ${dis}>${B("Teacher postpones", "선생님 사정 연기")}</button>
-            <button class="s" data-act="pp" data-by="student" data-blk="${esc(blk.cell)}" data-date="${r.date}" ${dis}>${B("Student postpones", "학생 사정 연기")}</button>
+            <button class="t" data-act="pp" data-by="teacher" data-blk="${esc(blk.cell)}" data-date="${r.date}" ${dis}>${I("Teacher", "선생님")}</button>
+            <button class="s" data-act="pp" data-by="student" data-blk="${esc(blk.cell)}" data-date="${r.date}" ${dis}>${I("Student", "학생")}</button>
           </div></td></tr>`]);
       } else {
         const by = r.rec.by === "teacher", mk = p.makeups.find(m => m.from === r), id = recId(stu, blk, r.date), sid = id.replace(/[^A-Za-z0-9_-]/g, "_");
         items.push([r.date, 0, `<tr class="pp">
           <td class="no mono">—</td><td class="date mono">${fmt(r.date)}</td>
-          <td class="hide-sm"><span class="chip ${by ? "t" : "s"}">${by ? I("Teacher postponed", "선생님 연기") : I("Student postponed", "학생 연기")}</span></td>
           <td><div class="ppedit">
+            <span class="chip ${by ? "t" : "s"}">${by ? I("Teacher postponed", "선생님 연기") : I("Student postponed", "학생 연기")}</span>
             <label for="mk-${sid}">${I("Make-up", "보강일")}</label>
             <input type="date" id="mk-${sid}" data-act="mk" data-id="${esc(id)}" value="${esc(r.rec.makeup || mk.date)}" ${dis}>
             ${r.rec.makeup ? "" : `<span class="sub">${I("auto", "자동")}</span>`}
@@ -444,8 +455,7 @@ th .bi .ko { letter-spacing: 0; }
     });
     p.makeups.forEach(m => items.push([m.date, 1, `<tr class="mk">
         <td class="no mono">${p.noByDate.get("makeup" + m.date)}</td><td class="date mono">${fmt(m.date)}</td>
-        <td class="hide-sm"><span class="chip m">${I("Make-up", "보강")}</span></td>
-        <td class="sub">${B(`Make-up for ${fmt(m.from.date)} (${m.from.rec.by === "teacher" ? "teacher" : "student"})${m.manual ? "" : " · auto"}`, `${fmt(m.from.date)} ${m.from.rec.by === "teacher" ? "선생님" : "학생"} 연기분${m.manual ? "" : " · 자동 배정"}`)}</td></tr>`]));
+        <td class="sub"><span class="chip m">${I("Make-up", "보강")}</span> ${B(`Make-up for ${fmt(m.from.date)} (${m.from.rec.by === "teacher" ? "teacher" : "student"})${m.manual ? "" : " · auto"}`, `${fmt(m.from.date)} ${m.from.rec.by === "teacher" ? "선생님" : "학생"} 연기분${m.manual ? "" : " · 자동 배정"}`)}</td></tr>`]));
     items.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]);
     const changed = p.end !== p.origEnd;
     const days = [...new Set(blk.lessons.map(l => dow(l.date)))].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => `${DOW_EN[d]}(${DOW_KO[d]})`).join(" ");
@@ -459,8 +469,13 @@ th .bi .ko { letter-spacing: 0; }
             <div class="summary"><span class="chip t">${I(`Teacher postponed ${p.t}`, "선생님 연기")}</span><span class="chip s">${I(`Student postponed ${p.st}`, "학생 연기")}</span></div>
             <a class="caplink" href="#c-${esc(stu.key)}--${esc(blk.cell)}">${I("Schedule card for student", "학생용 캡쳐 화면")} →</a></div>
         </div>
-        <div class="tablewrap"><table><thead><tr><th>${B("No.", "회차")}</th><th>${B("Date", "날짜")}</th><th class="hide-sm">${B("Status", "상태")}</th><th>${B("Postpone", "연기 기록")}</th></tr></thead>
-          <tbody>${items.map(i => i[2]).join("")}</tbody></table></div>
+        <div class="tables">${(() => {
+          // two columns side by side on a desktop screen: first half left, second half right
+          const half = Math.ceil(items.length / 2);
+          const head = `<thead><tr><th>${B("No.", "회차")}</th><th>${B("Date", "날짜")}</th><th>${B("Postpone because of", "연기 사유")}</th></tr></thead>`;
+          return [items.slice(0, half), items.slice(half)].filter(x => x.length)
+            .map(part => `<div class="tablewrap"><table>${head}<tbody>${part.map(i => i[2]).join("")}</tbody></table></div>`).join("");
+        })()}</div>
         ${log.length ? `<div class="log"><strong>${I("Postponement history", "연기 내역")}</strong><ul>${log.join("")}</ul></div>` : ""}
       </section>`;
   }
