@@ -1,6 +1,6 @@
 /* Layout: one column — header, teacher tabs, weekly grid (days × times), request/edit panels below. Labels English first, Korean second. */
 :root{
-  --bg:#F3F5F1; --surface:#FFFFFF; --ink:#18272B; --muted:#5F6F72; --line:#D9E0DB;
+  --bg:#FFFFFF; --surface:#FFFFFF; --ink:#18272B; --muted:#5F6F72; --line:#D9E0DB;
   --open:#17806A; --open-bg:#DCF1E8; --open-ink:#0E5A4A;
   --taken-bg:#E7EAE8; --taken-ink:#7A8786;
   --accent:#E39A2D; --accent-bg:#FCEFD8; --accent-ink:#7A4B07;
@@ -10,16 +10,6 @@
   --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
   color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0F1719; --surface:#172225; --ink:#E7EEEC; --muted:#93A3A3; --line:#2A3A3D;
-  --open:#4CC3A2; --open-bg:#143A31; --open-ink:#A6EAD6;
-  --taken-bg:#212C2E; --taken-ink:#7E8C8C;
-  --accent:#F0B354; --accent-bg:#3A2A10; --accent-ink:#F7D59B; --danger:#E5826C; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0F1719; --surface:#172225; --ink:#E7EEEC; --muted:#93A3A3; --line:#2A3A3D;
-  --open:#4CC3A2; --open-bg:#143A31; --open-ink:#A6EAD6;
-  --taken-bg:#212C2E; --taken-ink:#7E8C8C;
-  --accent:#F0B354; --accent-bg:#3A2A10; --accent-ink:#F7D59B; --danger:#E5826C; color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
 [hidden]{display:none!important}

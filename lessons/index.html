@@ -9,7 +9,7 @@
 <style>
 /* Lesson register: teacher picker → teacher's roster → one student per page (#hash). Data is encrypted in the repo. */
 :root {
-  --bg: #f6f7f9; --surface: #ffffff; --line: #dfe3ea; --fg: #1b2230; --muted: #5d6779;
+  --bg: #ffffff; --surface: #ffffff; --line: #dfe3ea; --fg: #1b2230; --muted: #5d6779;
   --accent: #2357c6; --accent-soft: #e6edfb;
   --teacher: #b5650b; --teacher-soft: #fdf0de;
   --student: #7a3fc4; --student-soft: #f1e8fc;
@@ -19,13 +19,6 @@
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) { :root {
-  --bg: #12161d; --surface: #1a2029; --line: #2c3442; --fg: #e6eaf1; --muted: #9aa4b5;
-  --accent: #7ea6ff; --accent-soft: #1f2b45;
-  --teacher: #f0a54a; --teacher-soft: #3a2a14;
-  --student: #c39bff; --student-soft: #2d2142;
-  --makeup: #5fd39a; --makeup-soft: #15342a;
-  --warn: #ff8a7a; --warn-soft: #3d1d1a; color-scheme: dark; } }
 * { box-sizing: border-box; }
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
