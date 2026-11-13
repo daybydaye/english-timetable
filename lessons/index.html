@@ -244,7 +244,6 @@ tr.today td.no { box-shadow: inset 3px 0 0 var(--accent); }
   function build(raw) {
     const groups = new Map();
     raw.forEach(b => {
-      if (b.sheet === "monica,greg") { b.name = "Monica&Greg"; b.time = "9 40pm"; b.teacher = "kimmy"; }
       if (/\d/.test(b.teacher) && !/\d/.test(b.time)) { const t = b.teacher; b.teacher = b.time; b.time = t; }
       const bad = b.lessons.filter(l => !l.ok).length;
       if (b.lessons.length < 2 || bad > b.lessons.length / 2) return;
