@@ -4,6 +4,8 @@
 - 체험수업 신청: `trial.html`. 안내 + 날짜·시간 선택(시간표의 '예약 가능' 칸 기준) → 신청 문구 복사 후 1:1 오픈채팅이 열립니다. 안내 문구는 data.json에 `"trial": {"intro": "...", "ahead": 14, "length": 20}` 로 바꿀 수 있어요.
 - 선생님용: `teacher.html`. 선생님 키를 넣고 칸을 칠한 뒤 저장하면 `data.json`에 커밋됩니다. 1~2분 안에 학생 화면에 반영됩니다.
 
+- 수업 기록부: `lessons/`. 선생님별 학생 목록과 회차별 연기(선생님 사정/학생 사정) 기록. 학생 이름과 기록은 `lessons/data/`에 암호화되어 있어 비밀번호가 있어야 열립니다. 연기 저장은 위의 선생님 키로 `lessons/data/postpone.enc.json`에 커밋됩니다. 비밀번호는 저장소에 적지 마세요.
+
 ## 선생님 키 만들기 (원장님)
 1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token
 2. Repository access: **Only select repositories** → 이 저장소만 선택

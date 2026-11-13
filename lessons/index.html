@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>수업 기록부 · 화상영어</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Lesson register: teacher picker → teacher's roster → one student per page (#hash). Data is encrypted in the repo. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --line: #dfe3ea; --fg: #1b2230; --muted: #5d6779;
+  --accent: #2357c6; --accent-soft: #e6edfb;
+  --teacher: #b5650b; --teacher-soft: #fdf0de;
+  --student: #7a3fc4; --student-soft: #f1e8fc;
+  --makeup: #1f7a4d; --makeup-soft: #e2f4ea;
+  --warn: #b42318; --warn-soft: #fdebe9;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #12161d; --surface: #1a2029; --line: #2c3442; --fg: #e6eaf1; --muted: #9aa4b5;
+  --accent: #7ea6ff; --accent-soft: #1f2b45;
+  --teacher: #f0a54a; --teacher-soft: #3a2a14;
+  --student: #c39bff; --student-soft: #2d2142;
+  --makeup: #5fd39a; --makeup-soft: #15342a;
+  --warn: #ff8a7a; --warn-soft: #3d1d1a; color-scheme: dark; } }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+h1, h2 { margin: 0; text-wrap: balance; }
+h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; font-weight: 600; }
+.sub { color: var(--muted); font-size: 0.9rem; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.status { font-size: 0.82rem; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status.warn { color: var(--warn); }
+a { color: var(--accent); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); padding: 5px 10px; font-size: 0.85rem; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; padding: 8px 14px; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.t { color: var(--teacher); border-color: color-mix(in srgb, var(--teacher) 40%, var(--line)); }
+button.t:hover:not(:disabled) { background: var(--teacher-soft); }
+button.s { color: var(--student); border-color: color-mix(in srgb, var(--student) 40%, var(--line)); }
+button.s:hover:not(:disabled) { background: var(--student-soft); }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+input[type=date], input[type=text], input[type=password] { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 4px 8px; font-size: 0.85rem; min-width: 0; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 500; white-space: nowrap; }
+.chip.t { background: var(--teacher-soft); color: var(--teacher); }
+.chip.s { background: var(--student-soft); color: var(--student); }
+.chip.m { background: var(--makeup-soft); color: var(--makeup); }
+.chip.w { background: var(--warn-soft); color: var(--warn); }
+.chip.a { background: var(--accent-soft); color: var(--accent); }
+.chip.n { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.group { display: grid; gap: 8px; }
+.group-h { display: flex; align-items: baseline; gap: 8px; }
+.group-h .count { color: var(--muted); font-size: 0.85rem; }
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.card { display: grid; gap: 6px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--fg); min-width: 0; }
+a.card:hover { border-color: var(--accent); }
+.card .row1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.card .nm { font-weight: 600; overflow-wrap: anywhere; }
+.card .meta { color: var(--muted); font-size: 0.82rem; }
+.card .end { font-size: 0.85rem; }
+.card .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tcard { gap: 10px; }
+.tcard .tlink { color: var(--fg); text-decoration: none; font-size: 1.05rem; }
+.tcard .tlink:hover { color: var(--accent); }
+.linkrow { display: flex; gap: 6px; min-width: 0; }
+.linkrow input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.back { font-size: 0.9rem; text-decoration: none; }
+.who { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 0.9rem; }
+.block { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; display: grid; }
+.block-h { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.block-h .left { display: grid; gap: 4px; min-width: 0; }
+.summary { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.endline { font-size: 0.92rem; }
+.endline del { color: var(--muted); }
+.endline strong { color: var(--accent); }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; }
+tr:last-child td { border-bottom: none; }
+tr.past td.date, tr.past td.no { color: var(--muted); }
+tr.pp td { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+tr.pp td.date { text-decoration: line-through; color: var(--muted); }
+tr.mk td { background: var(--makeup-soft); }
+tr.today td.no { box-shadow: inset 3px 0 0 var(--accent); }
+.acts, .ppedit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ppedit label { font-size: 0.78rem; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.82rem; color: var(--muted); align-items: center; }
+.empty { padding: 24px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 8px; }
+.log { display: grid; gap: 4px; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 0.85rem; }
+.log ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; color: var(--muted); }
+.gate { max-width: 420px; margin: 8vh auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 14px; }
+.gate form { display: grid; gap: 10px; }
+.gate input { padding: 9px 10px; font-size: 1rem; }
+.gate .err { color: var(--warn); font-size: 0.85rem; }
+.keybar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--teacher) 40%, var(--line)); background: var(--teacher-soft); border-radius: 8px; font-size: 0.88rem; }
+.keybar input { flex: 1 1 220px; }
+.check { display: flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--muted); }
+@media (max-width: 560px) { th.hide-sm, td.hide-sm { display: none; } th, td { padding: 7px 8px; } }
+@media (prefers-reduced-motion: no-preference) { .card, button { transition: border-color .12s, background-color .12s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>화상영어 수업 기록부</h1>
+      <div class="sub" id="todayline"></div>
+    </div>
+    <div class="status" id="status" role="status"></div>
+  </div>
+  <div id="keyslot"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // ---------- where the data lives (this GitHub repository) ----------
+  const CONFIG = { owner: "daybydaye", repo: "english-timetable", branch: "main", dir: "lessons/data" };
+  (function () {
+    const m = location.hostname.match(/^([a-z0-9-]+)\.github\.io$/i), seg = location.pathname.split("/").filter(Boolean);
+    if (m) { CONFIG.owner = m[1]; if (seg.length && seg[0] !== "lessons" && !/\.html?$/i.test(seg[0])) CONFIG.repo = seg[0]; }
+  })();
+  const API = p => `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.dir}/${p}`;
+  const PP_FILE = "postpone.enc.json", BLOCKS_FILE = "blocks.enc.json";
+
+  const DOW_KO = ["일", "월", "화", "수", "목", "금", "토"];
+  const $view = document.getElementById("view"), $status = document.getElementById("status"), $key = document.getElementById("keyslot");
+  const lget = k => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+  const lset = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (_) {} };
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  let password = lget("lr.pw") || "";
+  let token = lget("tt.key") || "";      // same "선생님 키" the timetable's teacher page uses
+  let students = [], pp = {}, ppSha = null, busy = false, lastMsg = "", lastLoad = 0;
+
+  // ---------- crypto: openssl enc -aes-256-cbc -pbkdf2 -iter N -md sha256 compatible ----------
+  const te = new TextEncoder(), td = new TextDecoder();
+  const b64ToBytes = b => Uint8Array.from(atob(b.replace(/\s+/g, "")), c => c.charCodeAt(0));
+  const bytesToB64 = u => { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  async function deriveKeyIv(pw, salt, iter) {
+    const base = await crypto.subtle.importKey("raw", te.encode(pw), "PBKDF2", false, ["deriveBits"]);
+    const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: iter, hash: "SHA-256" }, base, 384));
+    const key = await crypto.subtle.importKey("raw", bits.slice(0, 32), "AES-CBC", false, ["encrypt", "decrypt"]);
+    return { key, iv: bits.slice(32, 48) };
+  }
+  async function decrypt(env, pw) {
+    const raw = b64ToBytes(env.data);
+    if (td.decode(raw.slice(0, 8)) !== "Salted__") throw new Error("format");
+    const { key, iv } = await deriveKeyIv(pw, raw.slice(8, 16), env.iter || 200000);
+    const plain = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, key, raw.slice(16));
+    return JSON.parse(td.decode(plain).replace(/^﻿/, ""));
+  }
+  async function encrypt(obj, pw, iter = 200000) {
+    const salt = crypto.getRandomValues(new Uint8Array(8));
+    const { key, iv } = await deriveKeyIv(pw, salt, iter);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-CBC", iv }, key, te.encode(JSON.stringify(obj))));
+    const out = new Uint8Array(16 + ct.length); out.set(te.encode("Salted__")); out.set(salt, 8); out.set(ct, 16);
+    return { v: 1, iter, data: bytesToB64(out) };
+  }
+
+  // ---------- GitHub reads / writes ----------
+  const authHeaders = () => ({ Authorization: "Bearer " + token, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" });
+  async function fetchEnvelope(file) {
+    // signed-in teachers read through the API (fresh, higher rate limit); others fall back to the published file
+    if (token) {
+      try {
+        const r = await fetch(API(file) + "?ref=" + CONFIG.branch + "&t=" + Date.now(), { headers: authHeaders(), cache: "no-store" });
+        if (r.ok) { const j = await r.json(); return { env: JSON.parse(td.decode(b64ToBytes(j.content))), sha: j.sha }; }
+      } catch (_) {}
+    }
+    try {
+      const r = await fetch(API(file) + "?ref=" + CONFIG.branch + "&t=" + Date.now(), { headers: { Accept: "application/vnd.github.raw+json" }, cache: "no-store" });
+      if (r.ok) return { env: await r.json(), sha: null };
+    } catch (_) {}
+    const r = await fetch("data/" + file + "?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error("load " + r.status);
+    return { env: await r.json(), sha: null };
+  }
+  async function loadPostponements() {
+    const { env, sha } = await fetchEnvelope(PP_FILE);
+    const obj = await decrypt(env, password);
+    pp = obj.records || {}; if (sha) ppSha = sha; lastLoad = Date.now();
+  }
+  // apply one change on top of the latest file, retrying once if someone saved in between
+  async function commit(change, label) {
+    if (!token) { showKeyBar(true); return false; }
+    busy = true; setStatus("저장 중…");
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r0 = await fetch(API(PP_FILE) + "?ref=" + CONFIG.branch + "&t=" + Date.now(), { headers: authHeaders(), cache: "no-store" });
+      if (r0.status === 401) { busy = false; token = ""; lset("tt.key", ""); showKeyBar(true, "선생님 키가 맞지 않습니다. 다시 넣어 주세요."); setStatus(); return false; }
+      if (!r0.ok) { busy = false; setStatus("저장하지 못했습니다 (" + r0.status + ")", true); return false; }
+      const j = await r0.json();
+      const latest = await decrypt(JSON.parse(td.decode(b64ToBytes(j.content))), password);
+      const recs = latest.records || {};
+      change(recs);
+      const env = await encrypt({ records: recs, updated: new Date().toISOString() }, password);
+      const body = { message: "수업 기록부: " + label, content: bytesToB64(te.encode(JSON.stringify(env) + "\n")), sha: j.sha, branch: CONFIG.branch };
+      const r = await fetch(API(PP_FILE), { method: "PUT", headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()), body: JSON.stringify(body) });
+      if (r.ok) { const k = await r.json(); ppSha = k.content && k.content.sha; pp = recs; lastLoad = Date.now(); busy = false; setStatus("저장됨"); route(); return true; }
+      if (r.status === 409 || r.status === 422) continue;
+      busy = false;
+      setStatus(r.status === 403 || r.status === 404 ? "이 선생님 키로는 저장할 수 없습니다" : "저장하지 못했습니다 (" + r.status + ")", true);
+      return false;
+    }
+    busy = false; setStatus("다른 선생님 저장과 겹쳤습니다. 다시 눌러 주세요", true); return false;
+  }
+
+  // ---------- dates (UTC) ----------
+  const toD = s => { const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const toS = d => d.toISOString().slice(0, 10);
+  const addDays = (s, n) => { const d = toD(s); d.setUTCDate(d.getUTCDate() + n); return toS(d); };
+  const now = new Date();
+  const TODAY = toS(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+  const dow = s => toD(s).getUTCDay();
+  const WEEK_START = addDays(TODAY, -((dow(TODAY) + 6) % 7)), WEEK_END = addDays(WEEK_START, 6), NEXT_END = addDays(WEEK_END, 7);
+  const fmt = s => { const d = toD(s); return `${d.getUTCMonth() + 1}/${d.getUTCDate()} (${DOW_KO[d.getUTCDay()]})`; };
+  document.getElementById("todayline").textContent = `오늘 ${fmt(TODAY)} · 이번 주 ${fmt(WEEK_START)} ~ ${fmt(WEEK_END)}`;
+
+  // ---------- teachers (names as on the timetable page) ----------
+  const TEACHERS = [
+    { key: "kimmy", name: "Kimmy", alias: ["kimmy", "kimmi"] }, { key: "jacque", name: "Jacque", alias: ["jacque", "jac"] },
+    { key: "donna", name: "Donna", alias: ["donna"] }, { key: "jenna", name: "Jenna", alias: ["jenna"] },
+    { key: "mj", name: "MJ", alias: ["mj"] }, { key: "denise", name: "Denise", alias: ["denise"] },
+    { key: "rizza", name: "Rizza", alias: ["rizza"] }, { key: "lauren", name: "Lauren", alias: ["lauren"] },
+  ];
+  const normT = s => { const v = String(s || "").trim().toLowerCase(); const t = TEACHERS.find(t => t.alias.includes(v)); return t ? t.key : (v ? v.replace(/[^a-z0-9]+/g, "-") : "none"); };
+  const tName = k => (TEACHERS.find(t => t.key === k) || { name: k === "none" ? "미지정" : k }).name;
+
+  // ---------- schedule data ----------
+  const slug = s => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  function build(raw) {
+    const groups = new Map();
+    raw.forEach(b => {
+      if (b.sheet === "monica,greg") { b.name = "Monica&Greg"; b.time = "9 40pm"; b.teacher = "kimmy"; }
+      if (/\d/.test(b.teacher) && !/\d/.test(b.time)) { const t = b.teacher; b.teacher = b.time; b.time = t; }
+      const bad = b.lessons.filter(l => !l.ok).length;
+      if (b.lessons.length < 2 || bad > b.lessons.length / 2) return;
+      const k = b.sheet + "|" + b.name.toLowerCase();
+      if (!groups.has(k)) groups.set(k, { name: b.name, sheet: b.sheet, time: b.time, teacher: b.teacher, blocks: [] });
+      groups.get(k).blocks.push(b);
+    });
+    const used = new Set();
+    return [...groups.values()].map((g, i) => {
+      const latest = g.blocks.reduce((a, b) => (b.end > a.end ? b : a));
+      g.time = latest.time || g.time; g.teacher = latest.teacher || g.teacher;
+      g.tk = normT(g.teacher); g.teacher = tName(g.tk);
+      g.blocks.forEach(b => { b.teacher = b.teacher ? tName(normT(b.teacher)) : ""; });
+      let key = slug(g.name) || "student";
+      if (used.has(key) || key.startsWith("t-")) key = slug(g.name + "-" + g.sheet) || key + "-" + i;
+      if (used.has(key)) key += "-" + i;
+      used.add(key); g.key = key;
+      return g;
+    });
+  }
+
+  // ---------- postponement logic ----------
+  const recId = (stu, blk, date) => `${stu.key}~${blk.cell}~${date}`;
+  function blockPlan(stu, blk) {
+    const pattern = new Set(blk.lessons.map(l => dow(l.date)));
+    const rows = blk.lessons.map(l => ({ date: l.date, rec: pp[recId(stu, blk, l.date)] || null }));
+    const held = rows.filter(r => !r.rec).map(r => r.date);
+    const makeups = [], taken = new Set(held);
+    rows.filter(r => r.rec && r.rec.makeup).forEach(r => { taken.add(r.rec.makeup); makeups.push({ date: r.rec.makeup, from: r, manual: true }); });
+    let cursor = [...taken, blk.lessons[blk.lessons.length - 1].date].sort().pop();
+    rows.filter(r => r.rec && !r.rec.makeup).forEach(r => {
+      let d = cursor, guard = 0;
+      do { d = addDays(d, 1); guard++; } while ((!pattern.has(dow(d)) || taken.has(d)) && guard < 60);
+      taken.add(d); cursor = d; makeups.push({ date: d, from: r, manual: false });
+    });
+    const sessions = [...held.map(d => ({ date: d, kind: "lesson" })), ...makeups.map(m => ({ date: m.date, kind: "makeup" }))].sort((a, b) => a.date < b.date ? -1 : 1);
+    const noByDate = new Map(sessions.map((s, i) => [s.kind + s.date, i + 1]));
+    const end = sessions.length ? sessions[sessions.length - 1].date : blk.end;
+    return { rows, makeups, noByDate, end, origEnd: blk.end,
+      t: rows.filter(r => r.rec && r.rec.by === "teacher").length, st: rows.filter(r => r.rec && r.rec.by === "student").length, total: blk.lessons.length };
+  }
+  function currentBlock(stu) {
+    const bs = stu.blocks.map(b => ({ b, p: blockPlan(stu, b) }));
+    const live = bs.filter(x => x.b.start <= TODAY && x.p.end >= TODAY).sort((a, b) => a.p.end < b.p.end ? -1 : 1);
+    if (live.length) return live[live.length - 1];
+    const up = bs.filter(x => x.b.start > TODAY).sort((a, b) => a.b.start < b.b.start ? -1 : 1);
+    if (up.length) return up[0];
+    return bs.sort((a, b) => a.p.end < b.p.end ? 1 : -1)[0];
+  }
+  function finishInfo(stu) {
+    const bs = stu.blocks.map(b => blockPlan(stu, b));
+    return { end: bs.map(p => p.end).sort().pop(), t: bs.reduce((a, p) => a + p.t, 0), s: bs.reduce((a, p) => a + p.st, 0), changed: bs.some(p => p.end !== p.origEnd) };
+  }
+  const sectionOf = f => f.end < WEEK_START ? 3 : f.end <= WEEK_END ? 0 : f.end <= NEXT_END ? 1 : 2;
+
+  // ---------- status + teacher key ----------
+  function setStatus(msg, warn) {
+    if (msg !== undefined) lastMsg = msg;
+    $status.className = "status" + (warn ? " warn" : "");
+    const who = token ? "선생님 키 연결됨" : "보기 전용";
+    $status.innerHTML = `<span>${esc(lastMsg || who)}</span>${token ? '<button class="ghost" id="keyout">키 지우기</button>' : '<button class="ghost" id="keyin">선생님 키 넣기</button>'}`;
+    const o = document.getElementById("keyout"), i = document.getElementById("keyin");
+    if (o) o.onclick = () => { token = ""; lset("tt.key", ""); lastMsg = ""; setStatus(); route(); };
+    if (i) i.onclick = () => showKeyBar(true);
+  }
+  function showKeyBar(show, err) {
+    if (!show) { $key.innerHTML = ""; return; }
+    $key.innerHTML = `<form class="keybar" id="keyform">
+      <span>연기를 저장하려면 시간표 선생님 페이지에서 쓰는 <b>선생님 키</b>가 필요합니다.</span>
+      <input type="password" id="keyIn" autocomplete="off" spellcheck="false" placeholder="github_pat_…" aria-label="선생님 키">
+      <button class="primary" type="submit">연결</button><button class="ghost" type="button" id="keyclose">닫기</button>
+      ${err ? `<span class="chip w">${esc(err)}</span>` : ""}</form>`;
+    document.getElementById("keyclose").onclick = () => showKeyBar(false);
+    document.getElementById("keyform").onsubmit = async e => {
+      e.preventDefault();
+      const v = document.getElementById("keyIn").value.trim(); if (!v) return;
+      const r = await fetch(API(PP_FILE) + "?ref=" + CONFIG.branch, { headers: { Authorization: "Bearer " + v, Accept: "application/vnd.github+json" } }).catch(() => null);
+      if (!r || r.status === 401) { showKeyBar(true, "키가 맞지 않습니다"); return; }
+      token = v; lset("tt.key", v); showKeyBar(false); setStatus("선생님 키 연결됨"); route();
+    };
+    document.getElementById("keyIn").focus();
+  }
+
+  // ---------- views ----------
+  function renderTeachers() {
+    const keys = [...TEACHERS.map(t => t.key), ...new Set(students.map(s => s.tk).filter(k => !TEACHERS.some(t => t.key === k)))];
+    const base = location.origin + location.pathname;
+    $view.innerHTML = `
+      <div class="group" style="gap:16px">
+        <div class="sub">선생님별 링크를 각 선생님께 보내 주세요. 처음 열 때 수업 기록부 비밀번호를 한 번 넣으면 되고, 연기 저장에는 시간표 선생님 키를 씁니다.</div>
+        <div class="roster">${keys.map(k => {
+          const mine = students.filter(s => s.tk === k).map(s => ({ s, f: finishInfo(s) }));
+          const n = [0, 0, 0, 0]; mine.forEach(r => n[sectionOf(r.f)]++);
+          const t = mine.reduce((a, r) => a + r.f.t, 0), st = mine.reduce((a, r) => a + r.f.s, 0);
+          return `<div class="card tcard">
+            <div class="row1"><a class="nm tlink" href="#t-${esc(k)}">${esc(tName(k))} 선생님</a><span class="meta">학생 ${mine.length}명</span></div>
+            ${mine.length ? `<div class="chips">
+              ${n[0] ? `<span class="chip w">이번 주 종료 ${n[0]}</span>` : ""}${n[1] ? `<span class="chip a">다음 주 종료 ${n[1]}</span>` : ""}
+              ${n[3] ? `<span class="chip n">새 블록 필요 ${n[3]}</span>` : ""}
+              ${t ? `<span class="chip t">선생님 연기 ${t}</span>` : ""}${st ? `<span class="chip s">학생 연기 ${st}</span>` : ""}</div>`
+              : `<div class="meta">엑셀에 등록된 학생이 없습니다</div>`}
+            <div class="linkrow"><input type="text" id="lk-${esc(k)}" value="${esc(base + "#t-" + k)}" readonly aria-label="${esc(tName(k))} 선생님 링크"><button data-copy="lk-${esc(k)}">링크 복사</button></div>
+          </div>`; }).join("")}</div>
+      </div>`;
+    $view.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+      const inp = document.getElementById(b.dataset.copy);
+      const done = () => { b.textContent = "복사됨"; setTimeout(() => { b.textContent = "링크 복사"; }, 1500); };
+      try { navigator.clipboard.writeText(inp.value).then(done, () => inp.select()); } catch (_) { inp.select(); }
+    }));
+  }
+
+  function renderRoster(tk) {
+    const rows = students.filter(s => s.tk === tk).map(s => ({ s, f: finishInfo(s) }))
+      .sort((a, b) => a.f.end < b.f.end ? -1 : a.f.end > b.f.end ? 1 : a.s.name.localeCompare(b.s.name));
+    const titles = ["이번 주에 끝나요", "다음 주에 끝나요", "진행 중", "이미 끝남 · 새 블록 필요"];
+    const card = ({ s, f }) => `<a class="card" href="#${esc(s.key)}">
+        <div class="row1"><span class="nm">${esc(s.name)}</span><span class="meta mono">${esc(s.time)}</span></div>
+        ${s.sheet.toLowerCase() !== s.name.toLowerCase() ? `<div class="meta">엑셀 시트 ${esc(s.sheet)}</div>` : ""}
+        <div class="end">마지막 수업 <span class="mono">${fmt(f.end)}</span>${f.changed ? ' <span class="chip m">연기로 변경</span>' : ""}</div>
+        ${(f.t || f.s) ? `<div class="chips">${f.t ? `<span class="chip t">선생님 연기 ${f.t}</span>` : ""}${f.s ? `<span class="chip s">학생 연기 ${f.s}</span>` : ""}</div>` : ""}
+      </a>`;
+    $view.innerHTML = `<div class="group" style="gap:16px">
+        <a class="back" href="#">← 전체 선생님</a>
+        <div class="group" style="gap:4px"><h1>${esc(tName(tk))} 선생님</h1>
+          <span class="sub">학생 ${rows.length}명 · 학생을 누르면 회차별로 연기를 기록할 수 있습니다</span></div>
+        ${rows.length ? "" : '<div class="empty">엑셀에 이 선생님 이름으로 등록된 학생이 없습니다.</div>'}
+        ${[0, 1, 2, 3].map(i => { const r = rows.filter(x => sectionOf(x.f) === i); return r.length ? `<section class="group">
+          <div class="group-h"><h2>${titles[i]}</h2><span class="count">${r.length}명</span></div>
+          <div class="roster">${r.map(card).join("")}</div></section>` : ""; }).join("")}
+      </div>`;
+  }
+
+  function renderStudent(stu) {
+    const cur = currentBlock(stu);
+    const blocks = [...stu.blocks].sort((a, b) => (a === cur.b ? -1 : b === cur.b ? 1 : a.start < b.start ? 1 : -1));
+    $view.innerHTML = `<div class="group" style="gap:16px">
+        <a class="back" href="#t-${esc(stu.tk)}">← ${esc(tName(stu.tk))} 선생님 학생 목록</a>
+        <div class="group" style="gap:6px"><h1>${esc(stu.name)}</h1>
+          <div class="who"><span>선생님 ${esc(stu.teacher)}</span><span>시간 ${esc(stu.time) || "—"}</span><span>엑셀 시트 ${esc(stu.sheet)}</span></div></div>
+        <div class="legend"><span class="chip t">선생님 연기</span><span class="chip s">학생 연기</span><span class="chip m">보강</span>
+          <span>연기하면 그 회차는 블록 끝에 같은 요일로 보강이 붙습니다. 보강 날짜는 직접 바꿀 수 있어요.</span></div>
+        ${blocks.map(b => blockHtml(stu, b, b === cur.b)).join("")}
+      </div>`;
+    wire(stu);
+  }
+
+  function blockHtml(stu, blk, isCur) {
+    const p = blockPlan(stu, blk), dis = busy ? "disabled" : "";
+    const items = [];
+    p.rows.forEach(r => {
+      const past = r.date < TODAY ? " past" : "", today = r.date === TODAY ? " today" : "";
+      if (!r.rec) {
+        items.push([r.date, 0, `<tr class="${past}${today}">
+          <td class="no mono">${p.noByDate.get("lesson" + r.date)}</td><td class="date mono">${fmt(r.date)}</td>
+          <td class="hide-sm">${r.date === TODAY ? '<span class="chip a">오늘</span>' : past ? '<span class="sub">지난 수업</span>' : ""}</td>
+          <td><div class="acts">
+            <button class="t" data-act="pp" data-by="teacher" data-blk="${esc(blk.cell)}" data-date="${r.date}" ${dis}>선생님 사정 연기</button>
+            <button class="s" data-act="pp" data-by="student" data-blk="${esc(blk.cell)}" data-date="${r.date}" ${dis}>학생 사정 연기</button>
+          </div></td></tr>`]);
+      } else {
+        const by = r.rec.by === "teacher", mk = p.makeups.find(m => m.from === r), id = recId(stu, blk, r.date), sid = id.replace(/[^A-Za-z0-9_-]/g, "_");
+        items.push([r.date, 0, `<tr class="pp">
+          <td class="no mono">—</td><td class="date mono">${fmt(r.date)}</td>
+          <td class="hide-sm"><span class="chip ${by ? "t" : "s"}">${by ? "선생님 연기" : "학생 연기"}</span></td>
+          <td><div class="ppedit">
+            <label for="mk-${sid}">보강일</label>
+            <input type="date" id="mk-${sid}" data-act="mk" data-id="${esc(id)}" value="${esc(r.rec.makeup || mk.date)}" ${dis}>
+            ${r.rec.makeup ? "" : '<span class="sub">자동</span>'}
+            <input type="text" id="memo-${sid}" data-act="memo" data-id="${esc(id)}" placeholder="메모 (사유)" value="${esc(r.rec.memo || "")}" ${dis} style="width:9rem">
+            <button class="ghost" data-act="undo" data-id="${esc(id)}" ${dis}>연기 취소</button>
+          </div></td></tr>`]);
+      }
+    });
+    p.makeups.forEach(m => items.push([m.date, 1, `<tr class="mk">
+        <td class="no mono">${p.noByDate.get("makeup" + m.date)}</td><td class="date mono">${fmt(m.date)}</td>
+        <td class="hide-sm"><span class="chip m">보강</span></td>
+        <td class="sub">${fmt(m.from.date)} ${m.from.rec.by === "teacher" ? "선생님" : "학생"} 연기분${m.manual ? "" : " · 자동 배정"}</td></tr>`]));
+    items.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]);
+    const changed = p.end !== p.origEnd;
+    const days = [...new Set(blk.lessons.map(l => dow(l.date)))].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DOW_KO[d]).join("·");
+    const log = p.rows.filter(r => r.rec).map(r => `<li>${fmt(r.date)} · ${r.rec.by === "teacher" ? "선생님" : "학생"} 사정${r.rec.memo ? " · " + esc(r.rec.memo) : ""}${r.rec.at ? ` <span class="mono">(${esc(r.rec.at.slice(5, 10).replace("-", "/"))} 기록)</span>` : ""}</li>`);
+    return `<section class="block">
+        <div class="block-h">
+          <div class="left"><h2>${fmt(blk.start)} 시작 블록 ${isCur ? '<span class="chip a">현재</span>' : ""}</h2>
+            <div class="sub">${esc(blk.time)}${blk.teacher ? " · " + esc(blk.teacher) : ""} · ${p.total}회 · 요일 ${days} · 엑셀 ${esc(blk.cell)}</div></div>
+          <div class="left" style="justify-items:end">
+            <div class="endline">마지막 수업 ${changed ? `<del class="mono">${fmt(p.origEnd)}</del> → <strong class="mono">${fmt(p.end)}</strong>` : `<strong class="mono">${fmt(p.end)}</strong>`}</div>
+            <div class="summary"><span class="chip t">선생님 연기 ${p.t}</span><span class="chip s">학생 연기 ${p.st}</span></div></div>
+        </div>
+        <div class="tablewrap"><table><thead><tr><th>회차</th><th>날짜</th><th class="hide-sm">상태</th><th>연기 기록</th></tr></thead>
+          <tbody>${items.map(i => i[2]).join("")}</tbody></table></div>
+        ${log.length ? `<div class="log"><strong>연기 내역</strong><ul>${log.join("")}</ul></div>` : ""}
+      </section>`;
+  }
+
+  function wire(stu) {
+    const who = stu.name;
+    $view.querySelectorAll("[data-act=pp]").forEach(b => b.addEventListener("click", () => {
+      const blk = stu.blocks.find(x => x.cell === b.dataset.blk), id = recId(stu, blk, b.dataset.date);
+      const rec = { student: stu.key, block: blk.cell, date: b.dataset.date, by: b.dataset.by, makeup: "", memo: "", at: new Date().toISOString() };
+      commit(recs => { recs[id] = rec; }, `${b.dataset.date} ${b.dataset.by === "teacher" ? "선생님" : "학생"} 연기`);
+    }));
+    $view.querySelectorAll("[data-act=undo]").forEach(b => b.addEventListener("click", () => {
+      const id = b.dataset.id; commit(recs => { delete recs[id]; }, "연기 취소");
+    }));
+    $view.querySelectorAll("[data-act=mk]").forEach(inp => inp.addEventListener("change", () => {
+      const id = inp.dataset.id; commit(recs => { if (recs[id]) recs[id].makeup = inp.value || ""; }, "보강일 변경");
+    }));
+    $view.querySelectorAll("[data-act=memo]").forEach(inp => inp.addEventListener("change", () => {
+      const id = inp.dataset.id, v = inp.value.trim().slice(0, 200); commit(recs => { if (recs[id]) recs[id].memo = v; }, "메모");
+    }));
+    void who;
+  }
+
+  function route() {
+    if (!students.length) return;
+    const h = decodeURIComponent(location.hash.slice(1)), y = window.scrollY;
+    const stu = h && students.find(s => s.key === h);
+    if (stu) renderStudent(stu); else if (h.startsWith("t-")) renderRoster(h.slice(2)); else renderTeachers();
+    window.scrollTo(0, y);
+  }
+  let lastHash = location.hash;
+  window.addEventListener("hashchange", () => { route(); if (location.hash !== lastHash) window.scrollTo(0, 0); lastHash = location.hash; });
+
+  // ---------- unlock ----------
+  function gate(err) {
+    $view.innerHTML = `<div class="gate">
+      <h2>수업 기록부 비밀번호</h2>
+      <div class="sub">학생 이름과 수업 기록은 암호화되어 있어요. 원장님께 받은 비밀번호를 넣어 주세요.</div>
+      <form id="pwform">
+        <input type="password" id="pwIn" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호">
+        <label class="check"><input type="checkbox" id="pwKeep" checked> 이 기기에서 기억하기</label>
+        <button class="primary" type="submit">열기</button>
+        ${err ? `<div class="err">${esc(err)}</div>` : ""}
+      </form></div>`;
+    document.getElementById("pwform").onsubmit = e => {
+      e.preventDefault(); password = document.getElementById("pwIn").value;
+      start(document.getElementById("pwKeep").checked);
+    };
+    document.getElementById("pwIn").focus();
+  }
+  async function start(keep) {
+    if (!password) { gate(); return; }
+    $view.innerHTML = '<div class="empty">여는 중…</div>';
+    let raw;
+    try { raw = await decrypt((await fetchEnvelope(BLOCKS_FILE)).env, password); }
+    catch (e) { lset("lr.pw", ""); password = ""; gate(e && e.message && e.message.startsWith("load") ? "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : "비밀번호가 맞지 않습니다."); return; }
+    if (keep !== false) lset("lr.pw", password);
+    students = build(raw);
+    try { await loadPostponements(); setStatus(); } catch (_) { setStatus("연기 기록을 불러오지 못했습니다", true); }
+    route();
+  }
+
+  // near-real-time: pick up other teachers' changes every minute while the page is visible
+  setInterval(async () => {
+    if (!students.length || busy || document.hidden || Date.now() - lastLoad < 55000) return;
+    const a = document.activeElement; if (a && a.tagName === "INPUT") return;
+    try { const before = JSON.stringify(pp); await loadPostponements(); if (JSON.stringify(pp) !== before) route(); } catch (_) {}
+  }, 15000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && students.length && Date.now() - lastLoad > 30000) loadPostponements().then(route).catch(() => {}); });
+
+  setStatus();
+  start();
+})();
+</script>
+</body>
+</html>
