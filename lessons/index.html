@@ -69,6 +69,26 @@ a.card:hover { border-color: var(--accent); }
 .linkrow { display: flex; gap: 6px; min-width: 0; }
 .linkrow input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
 .back { font-size: 0.9rem; text-decoration: none; }
+.caplink { font-size: 0.85rem; text-decoration: none; }
+/* student schedule card: fits one phone screen for a screenshot */
+body.capmode .top { display: none; }
+body.capmode #keyslot { display: none; }
+.captool { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; max-width: 420px; margin: 0 auto 10px; }
+.capcard { max-width: 420px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 14px; display: grid; gap: 12px; }
+.capcard header { display: grid; gap: 2px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
+.capname { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; overflow-wrap: anywhere; }
+.capmeta { font-size: 0.92rem; color: var(--fg); }
+.caprange { font-size: 0.85rem; color: var(--muted); }
+.capcols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.capcols ol { list-style: none; margin: 0; padding: 0; display: grid; align-content: start; }
+.capcols li { display: grid; grid-template-columns: 1.6em 2.9em 1fr; align-items: center; gap: 4px; padding: 5px 2px; border-bottom: 1px solid var(--line); font-size: 0.9rem; min-width: 0; }
+.capcols li .n { color: var(--muted); font-size: 0.78rem; text-align: right; }
+.capcols li .dt { font-weight: 600; }
+.capcols li .dw { color: var(--muted); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.capcols li .tag { grid-column: 2 / -1; font-size: 0.72rem; color: var(--makeup); font-weight: 600; margin-top: -2px; }
+.capcols li.mk { background: var(--makeup-soft); }
+.capcols li.now { box-shadow: inset 3px 0 0 var(--accent); }
+.capcard footer { font-size: 0.8rem; color: var(--muted); }
 .who { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 0.9rem; }
 .block { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; display: grid; }
 .block-h { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
@@ -436,7 +456,8 @@ th .bi .ko { letter-spacing: 0; }
             <div class="sub">${esc(blk.time)}${blk.teacher ? " · " + esc(blk.teacher) : ""} · ${I(`${p.total} lessons`, `${p.total}회`)} · ${I("Days", "요일")} ${days} · ${I("Sheet", "엑셀")} ${esc(blk.cell)}</div></div>
           <div class="left" style="justify-items:end">
             <div class="endline">${I("Last lesson", "마지막 수업")} ${changed ? `<del class="mono">${fmt(p.origEnd)}</del> → <strong class="mono">${fmt(p.end)}</strong>` : `<strong class="mono">${fmt(p.end)}</strong>`}</div>
-            <div class="summary"><span class="chip t">${I(`Teacher postponed ${p.t}`, "선생님 연기")}</span><span class="chip s">${I(`Student postponed ${p.st}`, "학생 연기")}</span></div></div>
+            <div class="summary"><span class="chip t">${I(`Teacher postponed ${p.t}`, "선생님 연기")}</span><span class="chip s">${I(`Student postponed ${p.st}`, "학생 연기")}</span></div>
+            <a class="caplink" href="#c-${esc(stu.key)}--${esc(blk.cell)}">${I("Schedule card for student", "학생용 캡쳐 화면")} →</a></div>
         </div>
         <div class="tablewrap"><table><thead><tr><th>${B("No.", "회차")}</th><th>${B("Date", "날짜")}</th><th class="hide-sm">${B("Status", "상태")}</th><th>${B("Postpone", "연기 기록")}</th></tr></thead>
           <tbody>${items.map(i => i[2]).join("")}</tbody></table></div>
@@ -467,8 +488,43 @@ th .bi .ko { letter-spacing: 0; }
     if (!students.length) return;
     const h = decodeURIComponent(location.hash.slice(1)), y = window.scrollY;
     const stu = h && students.find(s => s.key === h);
-    if (stu) renderStudent(stu); else if (h.startsWith("t-")) renderRoster(h.slice(2)); else renderTeachers();
-    window.scrollTo(0, y);
+    const cap = h.startsWith("c-") ? h.slice(2).split("--") : null;
+    const capStu = cap && students.find(s => s.key === cap[0]);
+    const capBlk = capStu && capStu.blocks.find(b => b.cell === cap[1]);
+    document.body.classList.toggle("capmode", !!capBlk);
+    if (capBlk) renderCapture(capStu, capBlk);
+    else if (stu) renderStudent(stu); else if (h.startsWith("t-")) renderRoster(h.slice(2)); else renderTeachers();
+    window.scrollTo(0, capBlk ? 0 : y);
+  }
+
+  // One-screen card a teacher can screenshot and send to the student: every lesson in two columns
+  function renderCapture(stu, blk) {
+    const p = blockPlan(stu, blk);
+    const sessions = [
+      ...p.rows.filter(r => !r.rec).map(r => ({ date: r.date, mk: false })),
+      ...p.makeups.map(m => ({ date: m.date, mk: true })),
+    ].sort((a, b) => a.date < b.date ? -1 : 1).map((s, i) => ({ ...s, no: i + 1 }));
+    const half = Math.ceil(sessions.length / 2);
+    const cols = [sessions.slice(0, half), sessions.slice(half)];
+    const d = s => { const x = toD(s); return { md: `${x.getUTCMonth() + 1}/${x.getUTCDate()}`, en: DOW_EN[x.getUTCDay()], ko: DOW_KO[x.getUTCDay()] }; };
+    const row = s => { const x = d(s.date); return `<li class="${s.mk ? "mk" : ""}${s.date === TODAY ? " now" : ""}">
+        <span class="n mono">${s.no}</span><span class="dt mono">${x.md}</span><span class="dw">${x.en} <span lang="ko">${x.ko}</span></span>
+        ${s.mk ? `<span class="tag">${I("Make-up", "보강")}</span>` : ""}</li>`; };
+    const pps = p.rows.filter(r => r.rec);
+    const first = sessions.length ? sessions[0].date : blk.start, last = sessions.length ? sessions[sessions.length - 1].date : blk.end;
+    $view.innerHTML = `<div class="captool">
+        <a class="back" href="#${esc(stu.key)}">← ${I("Back", "돌아가기")}</a>
+        <span class="sub">${I("Screenshot the card below and send it to the student.", "아래 카드를 캡쳐해서 학생에게 보내세요.")}</span>
+      </div>
+      <article class="capcard" aria-label="Lesson schedule">
+        <header>
+          <div class="capname">${esc(stu.name)}</div>
+          <div class="capmeta">Teacher ${esc(blk.teacher || stu.teacher)} · ${esc(String(blk.time || stu.time).replace(/(\d{1,2})\s+(\d{2})\s*(am|pm)/i, "$1:$2$3"))} <span lang="ko">(한국 시간)</span></div>
+          <div class="caprange"><span class="mono">${d(first).md} ${d(first).en}</span> → <span class="mono">${d(last).md} ${d(last).en}</span> · ${I(`${sessions.length} lessons`, `${sessions.length}회`)}</div>
+        </header>
+        <div class="capcols">${cols.map(c => `<ol>${c.map(row).join("")}</ol>`).join("")}</div>
+        ${pps.length ? `<footer>${I("Postponed", "연기된 수업")}: ${pps.map(r => `<span class="mono">${d(r.date).md}</span>`).join(", ")} → ${I("moved to make-up", "보강으로 이동")}</footer>` : ""}
+      </article>`;
   }
   let lastHash = location.hash;
   window.addEventListener("hashchange", () => { route(); if (location.hash !== lastHash) window.scrollTo(0, 0); lastHash = location.hash; });
