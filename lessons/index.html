@@ -345,9 +345,9 @@ th .bi .ko { letter-spacing: 0; }
   }
   function showKeyBar(show, err) {
     if (!show) { $key.innerHTML = ""; return; }
-    $key.innerHTML = `<form class="keybar" id="keyform">
+    $key.innerHTML = `<form class="keybar" id="keyform" autocomplete="off">
       <span>${B("To save postponements, enter the <b>teacher key</b> you use on the timetable teacher page.", "연기를 저장하려면 시간표 선생님 페이지에서 쓰는 <b>선생님 키</b>가 필요합니다.")}</span>
-      <input type="password" id="keyIn" autocomplete="off" spellcheck="false" placeholder="github_pat_…" aria-label="Teacher key 선생님 키">
+      <input type="text" id="keyIn" name="gh-teacher-key" autocomplete="off" data-lpignore="true" data-1p-ignore autocapitalize="off" spellcheck="false" placeholder="github_pat_…" aria-label="Teacher key 선생님 키">
       <button class="primary" type="submit">${B("Connect", "연결")}</button><button class="ghost" type="button" id="keyclose">${B("Close", "닫기")}</button>
       ${err ? `<span class="chip w">${err}</span>` : ""}</form>`;
     document.getElementById("keyclose").onclick = () => showKeyBar(false);
