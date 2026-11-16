@@ -343,20 +343,29 @@ th .bi .ko { letter-spacing: 0; }
     if (o) o.onclick = () => { token = ""; lset("tt.key", ""); lastMsg = ""; setStatus(); route(); };
     if (i) i.onclick = () => showKeyBar(true);
   }
-  function showKeyBar(show, err) {
+  function showKeyBar(show, err, keep) {
     if (!show) { $key.innerHTML = ""; return; }
+    const seen = keep ? ` <span class="mono">(${I("entered", "입력된 값")}: ${esc(keep.slice(0, 11))}… ${keep.length}${I(" chars", "자")})</span>` : "";
+    if (err) err += seen;
     $key.innerHTML = `<form class="keybar" id="keyform" autocomplete="off">
       <span>${B("To save postponements, enter the <b>teacher key</b> you use on the timetable teacher page.", "연기를 저장하려면 시간표 선생님 페이지에서 쓰는 <b>선생님 키</b>가 필요합니다.")}</span>
       <input type="text" id="keyIn" name="gh-teacher-key" autocomplete="off" data-lpignore="true" data-1p-ignore autocapitalize="off" spellcheck="false" placeholder="github_pat_…" aria-label="Teacher key 선생님 키">
+      <button class="ghost" type="button" id="keypaste">${B("Paste", "붙여넣기")}</button>
       <button class="primary" type="submit">${B("Connect", "연결")}</button><button class="ghost" type="button" id="keyclose">${B("Close", "닫기")}</button>
       ${err ? `<span class="chip w">${err}</span>` : ""}</form>`;
     document.getElementById("keyclose").onclick = () => showKeyBar(false);
+    document.getElementById("keypaste").onclick = async () => {
+      try { const t = await navigator.clipboard.readText(); document.getElementById("keyIn").value = t.replace(/\s+/g, ""); }
+      catch (_) { showKeyBar(true, I("Couldn't read the clipboard. Click the box and press Ctrl+V.", "클립보드를 읽지 못했어요. 칸을 누르고 Ctrl+V 해 주세요.")); }
+    };
     document.getElementById("keyform").onsubmit = async e => {
       e.preventDefault();
       const v = document.getElementById("keyIn").value.replace(/\s+/g, ""); if (!v) return;
-      if (!/^(github_pat_|ghp_)/.test(v)) { showKeyBar(true, I("This is not a teacher key. The key starts with github_pat_ (the register password goes on the first screen).", "선생님 키가 아닙니다. 키는 github_pat_ 로 시작해요 (수업 기록부 비밀번호는 첫 화면에 넣어요).")); return; }
+      if (!/^(github_pat_|ghp_)/.test(v)) { showKeyBar(true, I("This is not a teacher key. The key starts with github_pat_ (the register password goes on the first screen).", "선생님 키가 아닙니다. 키는 github_pat_ 로 시작해요 (수업 기록부 비밀번호는 첫 화면에 넣어요)."), v); return; }
       const r = await fetch(API(PP_FILE) + "?ref=" + CONFIG.branch, { headers: { Authorization: "Bearer " + v, Accept: "application/vnd.github+json" } }).catch(() => null);
-      if (!r || r.status === 401) { showKeyBar(true, I("Wrong key. Copy the whole key again (it may be cut off in KakaoTalk).", "키가 맞지 않습니다. 키 전체를 다시 복사해 주세요 (카카오톡에서 잘릴 수 있어요).")); return; }
+      if (!r) { showKeyBar(true, I("No connection to GitHub. Try again.", "GitHub에 연결하지 못했어요. 다시 시도해 주세요."), v); return; }
+      if (r.status === 401) { showKeyBar(true, I("Wrong key. Copy the whole key again (it may be cut off in KakaoTalk).", "키가 맞지 않습니다. 키 전체를 다시 복사해 주세요 (카카오톡에서 잘릴 수 있어요)."), v); return; }
+      if (!r.ok) { showKeyBar(true, I(`This key can't open the register file (${r.status}). In GitHub, give the key access to english-timetable with Contents: Read and write.`, `이 키로는 기록 파일에 접근할 수 없어요 (${r.status}). GitHub에서 키에 english-timetable 저장소, Contents 읽기·쓰기 권한을 주세요.`), v); return; }
       token = v; lset("tt.key", v); showKeyBar(false); setStatus(""); route();
     };
     document.getElementById("keyIn").focus();
