@@ -386,6 +386,7 @@ th .bi .ko { letter-spacing: 0; }
       e.preventDefault();
       const v = document.getElementById("keyIn").value.replace(/\s+/g, ""); if (!v) return;
       if (!/^(github_pat_|ghp_)/.test(v)) { showKeyBar(true, I("This is not a teacher key. The key starts with github_pat_ (the register password goes on the first screen).", "선생님 키가 아닙니다. 키는 github_pat_ 로 시작해요 (수업 기록부 비밀번호는 첫 화면에 넣어요)."), v); return; }
+      if (v.startsWith("github_pat_") && v.length < 90) { showKeyBar(true, I(`Only part of the key was copied (${v.length} of about 93 characters). Copy it again with GitHub's copy button.`, `키가 일부만 복사됐어요 (93자 중 ${v.length}자). GitHub의 복사 버튼으로 다시 복사해 주세요.`), v); return; }
       const r = await fetch(API(PP_FILE) + "?ref=" + CONFIG.branch, { headers: { Authorization: "Bearer " + v, Accept: "application/vnd.github+json" } }).catch(() => null);
       if (!r) { showKeyBar(true, I("No connection to GitHub. Try again.", "GitHub에 연결하지 못했어요. 다시 시도해 주세요."), v); return; }
       if (r.status === 401) { showKeyBar(true, I("Wrong key. Copy the whole key again (it may be cut off in KakaoTalk).", "키가 맞지 않습니다. 키 전체를 다시 복사해 주세요 (카카오톡에서 잘릴 수 있어요)."), v); return; }
@@ -397,7 +398,12 @@ th .bi .ko { letter-spacing: 0; }
       }
       token = v; sharedKey = false; lset("tt.key", v); showKeyBar(false); setStatus(msg); route();
     };
-    document.getElementById("keyIn").focus();
+    // browsers keep auto-filling the saved register password here; wipe anything that isn't a key
+    const kin = document.getElementById("keyIn");
+    const wipe = () => { if (kin.value && !/^(github_pat_|ghp_)/.test(kin.value.trim())) kin.value = ""; };
+    [50, 300, 1000].forEach(t => setTimeout(wipe, t));
+    kin.addEventListener("focus", wipe);
+    kin.focus();
   }
 
   // ---------- views ----------
