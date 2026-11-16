@@ -164,7 +164,7 @@ th .bi .ko { letter-spacing: 0; }
     if (m) { CONFIG.owner = m[1]; if (seg.length && seg[0] !== "lessons" && !/\.html?$/i.test(seg[0])) CONFIG.repo = seg[0]; }
   })();
   const API = p => `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.dir}/${p}`;
-  const PP_FILE = "postpone.enc.json", BLOCKS_FILE = "blocks.enc.json";
+  const PP_FILE = "postpone.enc.json", BLOCKS_FILE = "blocks.enc.json", KEY_FILE = "key.enc.json";
 
   const DOW_KO = ["일", "월", "화", "수", "목", "금", "토"];
   const DOW_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -179,6 +179,7 @@ th .bi .ko { letter-spacing: 0; }
   let password = lget("lr.pw") || "";
   let token = lget("tt.key") || "";      // same "선생님 키" the timetable's teacher page uses
   let students = [], pp = {}, ppSha = null, busy = false, lastMsg = "", lastLoad = 0;
+  let sharedKey = false;                  // true when the token came from the director's shared key file (unlocked by the register password)
 
   // ---------- crypto: openssl enc -aes-256-cbc -pbkdf2 -iter N -md sha256 compatible ----------
   const te = new TextEncoder(), td = new TextDecoder();
@@ -223,6 +224,25 @@ th .bi .ko { letter-spacing: 0; }
     if (!r.ok) throw new Error("load " + r.status);
     return { env: await r.json(), sha: null };
   }
+  // the director's teacher key, stored encrypted with the register password, so the password alone lets teachers save
+  async function loadSharedKey() {
+    const saved = token; token = "";        // read the key file without a (possibly broken) personal key
+    let o = null;
+    try { o = await decrypt((await fetchEnvelope(KEY_FILE)).env, password); } catch (_) {}
+    token = saved;
+    if (o && o.key && o.key !== token) { token = o.key; sharedKey = true; return true; }
+    return false;
+  }
+  async function shareKey(v) {
+    const h = { Authorization: "Bearer " + v, Accept: "application/vnd.github+json" };
+    const cur = await fetch(API(KEY_FILE) + "?ref=" + CONFIG.branch + "&t=" + Date.now(), { headers: h, cache: "no-store" });
+    const sha = cur.ok ? (await cur.json()).sha : undefined;
+    const env = await encrypt({ key: v, at: new Date().toISOString() }, password);
+    const body = { message: "수업 기록부: 공용 선생님 키", content: bytesToB64(te.encode(JSON.stringify(env) + "\n")), branch: CONFIG.branch };
+    if (sha) body.sha = sha;
+    const r = await fetch(API(KEY_FILE), { method: "PUT", headers: Object.assign({ "Content-Type": "application/json" }, h), body: JSON.stringify(body) });
+    return r.ok ? 0 : r.status;
+  }
   async function loadPostponements() {
     const { env, sha } = await fetchEnvelope(PP_FILE);
     const obj = await decrypt(env, password);
@@ -234,7 +254,8 @@ th .bi .ko { letter-spacing: 0; }
     busy = true; setStatus(I("Saving…", "저장 중…"));
     for (let attempt = 0; attempt < 3; attempt++) {
       const r0 = await fetch(API(PP_FILE) + "?ref=" + CONFIG.branch + "&t=" + Date.now(), { headers: authHeaders(), cache: "no-store" });
-      if (r0.status === 401) { busy = false; token = ""; lset("tt.key", ""); showKeyBar(true, I("This teacher key doesn't work. Please enter it again.", "선생님 키가 맞지 않습니다. 다시 넣어 주세요.")); setStatus(""); return false; }
+      if (r0.status === 401 && !sharedKey && await loadSharedKey()) continue;
+      if (r0.status === 401) { busy = false; sharedKey = false; token = ""; lset("tt.key", ""); showKeyBar(true, I("This teacher key doesn't work. Please enter it again.", "선생님 키가 맞지 않습니다. 다시 넣어 주세요.")); setStatus(""); return false; }
       if (!r0.ok) { busy = false; setStatus(I(`Couldn't save (${r0.status})`, "저장하지 못했습니다"), true); return false; }
       const j = await r0.json();
       const latest = await decrypt(JSON.parse(td.decode(b64ToBytes(j.content))), password);
@@ -337,8 +358,10 @@ th .bi .ko { letter-spacing: 0; }
   function setStatus(msg, warn) {
     if (msg !== undefined) lastMsg = msg;
     $status.className = "status" + (warn ? " warn" : "");
-    const who = token ? I("Teacher key connected", "선생님 키 연결됨") : I("View only", "보기 전용");
-    $status.innerHTML = `<span>${lastMsg || who}</span>${token ? `<button class="ghost" id="keyout">${I("Remove key", "키 지우기")}</button>` : `<button class="ghost" id="keyin">${I("Add teacher key", "선생님 키 넣기")}</button>`}`;
+    const who = sharedKey ? I("Saving on", "저장 가능") : token ? I("Teacher key connected", "선생님 키 연결됨") : I("View only", "보기 전용");
+    const btn = sharedKey ? `<button class="ghost" id="keyin">${I("Director: change key", "원장님: 키 바꾸기")}</button>`
+      : token ? `<button class="ghost" id="keyout">${I("Remove key", "키 지우기")}</button>` : `<button class="ghost" id="keyin">${I("Add teacher key", "선생님 키 넣기")}</button>`;
+    $status.innerHTML = `<span>${lastMsg || who}</span>${btn}`;
     const o = document.getElementById("keyout"), i = document.getElementById("keyin");
     if (o) o.onclick = () => { token = ""; lset("tt.key", ""); lastMsg = ""; setStatus(); route(); };
     if (i) i.onclick = () => showKeyBar(true);
@@ -351,6 +374,7 @@ th .bi .ko { letter-spacing: 0; }
       <span>${B("To save postponements, enter the <b>teacher key</b> you use on the timetable teacher page.", "연기를 저장하려면 시간표 선생님 페이지에서 쓰는 <b>선생님 키</b>가 필요합니다.")}</span>
       <input type="text" id="keyIn" name="gh-teacher-key" autocomplete="off" data-lpignore="true" data-1p-ignore autocapitalize="off" spellcheck="false" placeholder="github_pat_…" aria-label="Teacher key 선생님 키">
       <button class="ghost" type="button" id="keypaste">${B("Paste", "붙여넣기")}</button>
+      <label class="check"><input type="checkbox" id="keyShare"> ${I("Director: let every teacher save with the register password", "원장님: 모든 선생님이 비밀번호만으로 저장하게 하기")}</label>
       <button class="primary" type="submit">${B("Connect", "연결")}</button><button class="ghost" type="button" id="keyclose">${B("Close", "닫기")}</button>
       ${err ? `<span class="chip w">${err}</span>` : ""}</form>`;
     document.getElementById("keyclose").onclick = () => showKeyBar(false);
@@ -366,7 +390,12 @@ th .bi .ko { letter-spacing: 0; }
       if (!r) { showKeyBar(true, I("No connection to GitHub. Try again.", "GitHub에 연결하지 못했어요. 다시 시도해 주세요."), v); return; }
       if (r.status === 401) { showKeyBar(true, I("Wrong key. Copy the whole key again (it may be cut off in KakaoTalk).", "키가 맞지 않습니다. 키 전체를 다시 복사해 주세요 (카카오톡에서 잘릴 수 있어요)."), v); return; }
       if (!r.ok) { showKeyBar(true, I(`This key can't open the register file (${r.status}). In GitHub, give the key access to english-timetable with Contents: Read and write.`, `이 키로는 기록 파일에 접근할 수 없어요 (${r.status}). GitHub에서 키에 english-timetable 저장소, Contents 읽기·쓰기 권한을 주세요.`), v); return; }
-      token = v; lset("tt.key", v); showKeyBar(false); setStatus(""); route();
+      let msg = "";
+      if (document.getElementById("keyShare").checked) {
+        const fail = await shareKey(v).catch(() => -1);
+        msg = fail ? I(`Connected, but couldn't share the key (${fail})`, "연결됐지만 공용 키 저장은 실패했어요") : I("Key shared: teachers can now save with the password only", "공용 키 저장됨: 이제 선생님들은 비밀번호만으로 저장할 수 있어요");
+      }
+      token = v; sharedKey = false; lset("tt.key", v); showKeyBar(false); setStatus(msg); route();
     };
     document.getElementById("keyIn").focus();
   }
@@ -377,8 +406,8 @@ th .bi .ko { letter-spacing: 0; }
     const base = location.origin + location.pathname;
     $view.innerHTML = `
       <div class="group" style="gap:16px">
-        <div class="sub group" style="gap:2px"><span>Send each teacher their own link. They enter the register password once, and use their timetable teacher key to save postponements.</span>
-          <span lang="ko">선생님별 링크를 각 선생님께 보내 주세요. 처음 열 때 수업 기록부 비밀번호를 한 번 넣으면 되고, 연기 저장에는 시간표 선생님 키를 씁니다.</span></div>
+        <div class="sub group" style="gap:2px"><span>Send each teacher their own link. They enter the register password once; with it they can view and save postponements.</span>
+          <span lang="ko">선생님별 링크를 각 선생님께 보내 주세요. 처음 열 때 수업 기록부 비밀번호를 한 번 넣으면 보기와 연기 저장이 모두 됩니다.</span></div>
         <div class="roster">${keys.map(k => {
           const mine = students.filter(s => s.tk === k).map(s => ({ s, f: finishInfo(s) }));
           const n = [0, 0, 0, 0]; mine.forEach(r => n[sectionOf(r.f)]++);
@@ -579,6 +608,7 @@ th .bi .ko { letter-spacing: 0; }
     try { raw = await decrypt((await fetchEnvelope(BLOCKS_FILE)).env, password); }
     catch (e) { lset("lr.pw", ""); password = ""; gate(e && e.message && e.message.startsWith("load") ? B("Couldn't load the data. Please try again in a moment.", "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.") : B("Wrong password.", "비밀번호가 맞지 않습니다.")); return; }
     if (keep !== false) lset("lr.pw", password);
+    if (!token) await loadSharedKey();
     students = build(raw);
     try { await loadPostponements(); setStatus(); } catch (_) { setStatus(I("Couldn't load postponements", "연기 기록을 불러오지 못했습니다"), true); }
     route();
