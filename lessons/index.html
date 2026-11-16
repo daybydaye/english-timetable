@@ -353,9 +353,10 @@ th .bi .ko { letter-spacing: 0; }
     document.getElementById("keyclose").onclick = () => showKeyBar(false);
     document.getElementById("keyform").onsubmit = async e => {
       e.preventDefault();
-      const v = document.getElementById("keyIn").value.trim(); if (!v) return;
+      const v = document.getElementById("keyIn").value.replace(/\s+/g, ""); if (!v) return;
+      if (!/^(github_pat_|ghp_)/.test(v)) { showKeyBar(true, I("This is not a teacher key. The key starts with github_pat_ (the register password goes on the first screen).", "선생님 키가 아닙니다. 키는 github_pat_ 로 시작해요 (수업 기록부 비밀번호는 첫 화면에 넣어요).")); return; }
       const r = await fetch(API(PP_FILE) + "?ref=" + CONFIG.branch, { headers: { Authorization: "Bearer " + v, Accept: "application/vnd.github+json" } }).catch(() => null);
-      if (!r || r.status === 401) { showKeyBar(true, I("Wrong key", "키가 맞지 않습니다")); return; }
+      if (!r || r.status === 401) { showKeyBar(true, I("Wrong key. Copy the whole key again (it may be cut off in KakaoTalk).", "키가 맞지 않습니다. 키 전체를 다시 복사해 주세요 (카카오톡에서 잘릴 수 있어요).")); return; }
       token = v; lset("tt.key", v); showKeyBar(false); setStatus(""); route();
     };
     document.getElementById("keyIn").focus();
@@ -557,7 +558,7 @@ th .bi .ko { letter-spacing: 0; }
         ${err ? `<div class="err">${err}</div>` : ""}
       </form></div>`;
     document.getElementById("pwform").onsubmit = e => {
-      e.preventDefault(); password = document.getElementById("pwIn").value;
+      e.preventDefault(); password = document.getElementById("pwIn").value.trim();
       start(document.getElementById("pwKeep").checked);
     };
     document.getElementById("pwIn").focus();
