@@ -30,7 +30,7 @@ var MSG={
   loadfail:['Could not load the timetable. Please refresh in a moment.','시간표를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.'],
   range:['End time must be later than start time.','끝 시간은 시작 시간보다 늦어야 해요.']
 };
-var view={teacher:sget('tt.teacher'),brush:'open',pick:null,req:false,sname:lget('tt.sname')||'',scur:'',
+var view={teacher:sget('tt.teacher'),brush:'open',pick:null,req:false,sname:lget('tt.sname')||'',scur:'',odate:'',pdate:'',
   saving:false,loading:true,msg:'',confirmDel:false,token:ADMIN?(lget('tt.key')||''):'',checking:false};
 
 function toMin(s){var p=String(s||'0:0').split(':');return (+p[0])*60+(+p[1]||0)}
@@ -102,12 +102,26 @@ function cellHTML(t,d,tm){
   var dis=(!ADMIN&&s!=='open')?' tabindex="-1" aria-disabled="true"':'';
   return '<button type="button" class="c '+s+(picked?' pick':'')+'" data-cell="'+esc(key(t.id,d,tm))+'" aria-label="'+esc(label)+'"'+dis+'>'+cellInner(c,picked)+'</button>';
 }
+// ── Dates (Korea time) for the change request ──
+var WD=['일','월','화','수','목','금','토'];
+function kstToday(){var n=new Date(Date.now()+9*3600e3);return new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate()))}
+function isoOf(d){return d.toISOString().slice(0,10)}
+function parseISO(s){var m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(s||'');return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null}
+function dlabel(s){var d=parseISO(s);return d?(d.getUTCMonth()+1)+'월 '+d.getUTCDate()+'일 ('+WD[d.getUTCDay()]+')':''}
+function upcoming(day,n){ // next n dates (from tomorrow) that fall on this weekday
+  var out=[],d=kstToday(),wd=WD.indexOf(day);if(wd<0)return out;
+  d.setUTCDate(d.getUTCDate()+1);
+  while(out.length<n){if(d.getUTCDay()===wd)out.push(isoOf(d));d.setUTCDate(d.getUTCDate()+1)}
+  return out;
+}
 function reqMsg(T){
   var p=view.pick&&T&&view.pick.t===T.id?view.pick:null;
+  var nt=p?(view.pdate?dlabel(view.pdate):p.d+'요일 ('+DAYEN[p.d]+')')+' '+p.tm+' · '+T.name:'';
   return '[시간 변경 신청 / Time change request]\n'+
     '학생 이름 Name: '+view.sname.trim()+'\n'+
     '현재 수업 Current class: '+view.scur.trim()+'\n'+
-    '희망 시간 New time: '+(p?T.name+' · '+p.d+'요일 ('+DAYEN[p.d]+') '+p.tm:'');
+    '바꿀 수업 날짜 Class to move: '+dlabel(view.odate)+'\n'+
+    '희망 날짜·시간 New date & time: '+nt;
 }
 function copyText(txt,ta){
   var ok=function(){var s=document.getElementById('copiedNote');if(s)s.hidden=false};
@@ -161,11 +175,17 @@ function render(){
     if(p||view.req){
       var ku=kakaoURL();
       h+='<div class="panel" id="reqPanel"><h3>'+B('Time change request','시간 변경 신청')+'</h3>';
-      h+=p?'<div class="pickline">'+B('New time','희망 시간')+' · <strong>'+esc(T.name)+'</strong> · '+esc(DAYEN[p.d])+' '+esc(p.d)+'요일 · '+esc(p.tm)+'</div>'
-          :'<p class="help">'+B('Tap a green “Open” slot above to choose the new time, or write it in the chat.','위 시간표에서 초록색 ‘예약 가능’ 칸을 누르면 희망 시간이 들어가요. 채팅에 직접 적어도 돼요.')+'</p>';
       h+='<div class="fields"><label class="field"><span>'+B('Student name','학생 이름')+'</span><input id="sName" data-in="sname" value="'+esc(view.sname)+'" maxlength="20" placeholder="e.g. 김민준"></label>'+
-        '<label class="field"><span>'+B('Current class','지금 수업 시간')+'</span><input id="sCur" data-in="scur" value="'+esc(view.scur)+'" maxlength="40" placeholder="e.g. 월·수 19:05 Kimmy"></label></div>';
-      h+='<textarea class="copy" id="copyText" rows="4" readonly>'+esc(reqMsg(T))+'</textarea>';
+        '<label class="field"><span>'+B('Current class','지금 수업 시간')+'</span><input id="sCur" data-in="scur" value="'+esc(view.scur)+'" maxlength="40" placeholder="e.g. 월·수 19:05 Kimmy"></label>'+
+        '<label class="field"><span>'+B('Date of the class to move','바꿀 수업 날짜')+'</span><input type="date" id="sOdate" data-in="odate" value="'+esc(view.odate)+'" min="'+isoOf(kstToday())+'"></label></div>';
+      if(p){
+        h+='<div class="pickline">'+B('New time','희망 시간')+' · <strong>'+esc(T.name)+'</strong> · '+esc(DAYEN[p.d])+' '+esc(p.d)+'요일 · '+esc(p.tm)+'</div>';
+        h+='<div class="field"><span>'+B('Which '+DAYEN[p.d]+'? Choose the new date','희망 날짜 고르기 ('+p.d+'요일)')+'</span><div class="datebar" role="group" aria-label="New date">';
+        upcoming(p.d,5).forEach(function(s){var d=parseISO(s);
+          h+='<button type="button" class="dchip" data-act="pdate" data-v="'+s+'" aria-pressed="'+(view.pdate===s)+'"><span class="dw">'+esc(p.d)+'</span><span class="dn">'+(d.getUTCMonth()+1)+'/'+d.getUTCDate()+'</span></button>'});
+        h+='</div></div>';
+      }else h+='<p class="help">'+B('Tap a green “Open” slot above to choose the new time, or write it in the chat.','위 시간표에서 초록색 ‘예약 가능’ 칸을 누르면 희망 시간이 들어가요. 채팅에 직접 적어도 돼요.')+'</p>';
+      h+='<textarea class="copy" id="copyText" rows="7" readonly>'+esc(reqMsg(T))+'</textarea>';
       h+='<div class="row">'+(ku?'<a class="btn kakao big" href="'+esc(ku)+'" target="_blank" rel="noopener" data-act="kakao">'+B('Copy & open chat','복사하고 오픈채팅 열기')+'</a>':'<button type="button" class="btn primary" data-act="copy">'+B('Copy request','신청 문구 복사')+'</button>')+
         '<button type="button" class="btn" data-act="unpick">'+B('Close','닫기')+'</button><span class="copied" id="copiedNote" hidden>'+B('Copied! Paste it in the chat.','복사했어요! 채팅창에 붙여넣어 보내 주세요.')+'</span></div>';
       h+='<p class="help">'+esc(state.settings.contact)+'</p></div>';
@@ -236,7 +256,7 @@ root.addEventListener('click',function(e){
   var c=e.target.closest('[data-cell]');
   if(c&&!ADMIN){
     var p=c.getAttribute('data-cell').split('|'),cc=state.cells[c.getAttribute('data-cell')];
-    if(cc&&cc.s==='open'){view.pick={t:p[0],d:p[1],tm:p[2]};view.req=true;render();var pl=document.getElementById('reqPanel');if(pl)pl.scrollIntoView({block:'nearest',behavior:'smooth'})}
+    if(cc&&cc.s==='open'){if(!view.pick||view.pick.d!==p[1])view.pdate='';view.pick={t:p[0],d:p[1],tm:p[2]};view.req=true;render();var pl=document.getElementById('reqPanel');if(pl)pl.scrollIntoView({block:'nearest',behavior:'smooth'})}
     return;
   }
   var b=e.target.closest('[data-act]');if(!b)return;
@@ -253,14 +273,15 @@ root.addEventListener('click',function(e){
   else if(a==='delT'){var T=teacher();state.teachers=state.teachers.filter(function(t){return t!==T});Object.keys(state.cells).forEach(function(k){if(k.split('|')[0]===T.id)delete state.cells[k]});view.confirmDel=false;view.teacher=state.teachers[0]?state.teachers[0].id:null}
   else if(a==='clearT'){var T2=teacher();Object.keys(state.cells).forEach(function(k){if(k.split('|')[0]===T2.id)delete state.cells[k]})}
   else if(a==='day'){var ds=state.settings.days,i=ds.indexOf(v);if(i>=0)ds.splice(i,1);else{ds.push(v);ds.sort(function(x,y){return DAYS.indexOf(x)-DAYS.indexOf(y)})}}
-  else if(a==='unpick'){view.pick=null;view.req=false}
+  else if(a==='unpick'){view.pick=null;view.req=false;view.pdate=''}
+  else if(a==='pdate'){view.pdate=view.pdate===v?'':v}
   else if(a==='revert'){state=JSON.parse(savedJSON);view.confirmDel=false}
   else if(a==='save'){save();return}
   render();
 });
 root.addEventListener('input',function(e){
   var f=e.target.getAttribute&&e.target.getAttribute('data-in');if(!f||!state)return;var v=e.target.value,T=teacher();
-  if(f==='sname'||f==='scur'){view[f]=v;if(f==='sname')lset('tt.sname',v);var ct=document.getElementById('copyText');if(ct)ct.value=reqMsg(T);var cn=document.getElementById('copiedNote');if(cn)cn.hidden=true;return}
+  if(f==='sname'||f==='scur'||f==='odate'){view[f]=v;if(f==='sname')lset('tt.sname',v);var ct=document.getElementById('copyText');if(ct)ct.value=reqMsg(T);var cn=document.getElementById('copiedNote');if(cn)cn.hidden=true;return}
   if(f==='tName'&&T){T.name=v;var tb=root.querySelector('.tab[aria-selected="true"] b');if(tb)tb.textContent=v;var h2=root.querySelector('.teacher-head h2');if(h2)h2.textContent=v}
   else if(f==='tNote'&&T){T.note=v}
   else if(f==='contact'){state.settings.contact=v}
