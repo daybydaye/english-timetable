@@ -611,7 +611,7 @@ th .bi .ko { letter-spacing: 0; }
     if (!password) { gate(); return; }
     $view.innerHTML = `<div class="empty">${I("Opening…", "여는 중…")}</div>`;
     let raw;
-    try { raw = await decrypt((await fetchEnvelope(BLOCKS_FILE)).env, password); }
+    try { const { env } = await fetchEnvelope(BLOCKS_FILE); raw = await decrypt(env, password); blocksData = env.data; blocksLoad = Date.now(); }
     catch (e) { lset("lr.pw", ""); password = ""; gate(e && e.message && e.message.startsWith("load") ? B("Couldn't load the data. Please try again in a moment.", "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.") : B("Wrong password.", "비밀번호가 맞지 않습니다.")); return; }
     if (keep !== false) lset("lr.pw", password);
     if (!token) await loadSharedKey();
@@ -625,8 +625,23 @@ th .bi .ko { letter-spacing: 0; }
     if (!students.length || busy || document.hidden || Date.now() - lastLoad < 55000) return;
     const a = document.activeElement; if (a && a.tagName === "INPUT") return;
     try { const before = JSON.stringify(pp); await loadPostponements(); if (JSON.stringify(pp) !== before) route(); } catch (_) {}
+    if (Date.now() - blocksLoad > 300000) refreshBlocks();
   }, 15000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && students.length && Date.now() - lastLoad > 30000) loadPostponements().then(route).catch(() => {}); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !students.length) return;
+    if (Date.now() - lastLoad > 30000) loadPostponements().then(route).catch(() => {});
+    if (Date.now() - blocksLoad > 60000) refreshBlocks();
+  });
+  // new schedules (blocks) are published by the director; reload them every 5 minutes and when the tab comes back
+  let blocksLoad = Date.now(), blocksData = "";
+  async function refreshBlocks() {
+    blocksLoad = Date.now();
+    try {
+      const { env } = await fetchEnvelope(BLOCKS_FILE);
+      if (!blocksData || env.data === blocksData) return;
+      students = build(await decrypt(env, password)); blocksData = env.data; route();
+    } catch (_) {}
+  }
 
   setStatus();
   start();
